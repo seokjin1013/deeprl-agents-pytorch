@@ -96,3 +96,32 @@ mainQ(s, a) = reward + discount * targetQ(s', argmax_a' mainQ(s', a'))
 CartPole-v2에 ddqn을 적용시킨 예시이다. dqn보다 안정적으로 매우 학습이 잘 되었다. reset될 때마다 중심에서 멀리 떨어져있으면 일부러 빠르게 pole을 기울여 중심으로 움직이고 최대한 꼿꼿하게 버티는 모습을 볼 수 있다.
 
 <img src="figure/ddqn-side-panelty-result.gif" alt="drawing" width="300"/>
+
+### 07-ddqn-bipedal: BipedalWalker-v3
+
+CartPole-v2가 너무 학습이 잘 되어서 좀 더 어려운 환경인 BipedalWalker를 학습시켜보고자 하였다.
+
+Q-learning은 원래 observation space와 action space가 모두 discrete할 때만 사용할 수 있다. 하지만 Q-table을 사용하는 대신 Q-network를 써서, 꼭 모든 state를 탐색하지 않아도 근사해서 action을 구해낼 수 있다. 다시 말해 Q-network를 쓰면 continuous한 observation space 환경에서도 학습할 수 있다. 하지만 action space까지 continuous인 경우에는 DDPG, A3C, C-DQN 같은 다른 기법을 사용해야 한다.
+
+하지만 모든 continuous한 데이터는 양자화하여 일부 정보의 손실을 감수하고 discrete한 데이터로 바꿀 수 있다. BipedalWalker는 observation space, action space가 모두 continuous한 환경인데, observation space는 Q-network를 사용하는 것으로 해결하고 action space는 양자화하여 discrete문제로 바꾸어 해결해보았다.
+
+action이 [-1, 1]범위의 수가 (4,) shape만큼 있는 continuous space라서 이를 -0.5, 0.5로 양자화하여 총 4개의 변수의 조합을 통해 2**4 = 16개의 action인 discrete문제로 접근하였다. 하지만 쓰러지지만 않을 뿐 앞으로 나아가지는 않는 저조한 성적을 보였다.
+
+<img src="figure/ddqn-bipedal-result.gif" alt="drawing" width="300"/>
+
+### 08-dueling-ddqn-bipedal: BipedalWalker-v3
+
+ddqn의 다음 세대인 dueling ddqn을 적용해서 잘 안풀리던 문제를 해결해보고자 하였다.
+
+dueling ddqn은 ddqn 마지막 부분의 구조를 약간 추가/변형시킨 것이다. 기존 네트워크는 출력값이 Q(s,a)를 의미했다면 dueling ddqn은 기존의 네트워크로 출력된 값으로 V(s), A(s,a)를 각각 구한 뒤 조합하여 Q(s,a)를 구한다. V (value function)은 특정 state s에서 그 상태가 얼마나 좋은 상태인지를 나타낸다. A (advantage function)은 state s에서 취할 수 있는 action a 중에서 특정한 action a가 얼마나 좋은 행동인지를 나타낸다. Q(s,a) = V(s) + A(s,a)로 나타낼 수 있다. Q(s,a)를 V와 A로 분리한 이유는 특정 환경에서 아무런 행동을 취하지 않아도, 혹은 어떤 행동을 취하든 상관없는 경우, 예를 들어 enduro atari 게임에서 도로에 깔린 장애물이 하나도 없는 경우, state가 좋아서 Q가 높은 값인 것인지, action이 좋아서 Q가 높은 값인 건지를 구분하여 학습한다. dueling구조는 다른 알고리즘에도 네트워크 마지막에 분리하는 구조를 넣어 적용할 수 있다.
+
+dueling 구조의 장점은 아래가 있다.
+
+1. 기존에는 한 번 학습할 때마다 특정 state와 action에 대해 따로따로 업데이트가 되었다면 dueling ddqn에서는 특정 state가 좋은 상황에서 state를 학습하고 action은 거의 바뀌지 않는 등의 학습이 이뤄져서 더 효율적이다.
+2. 실제로 action에 의한 Q값의 차이가 크지 않고, state에 의해 Q값이 커졌다면 특정 state에서 어떤 행동을 할지 결정하기 위한 과정에서 약간의 노이즈만 있으면 올바른 행동을 결정하지 못할 수 있지만 action을 분리해서 평가하면 노이즈에 강건해진다.
+
+실제로 구현할 땐 V(s) + A(s,a) - mean(A(s,a))로 구한다. 특정 state에서 할 수 있는 action들 가운데 가장 좋은 action을 가리기 위해 action의 평균을 빼는 것이다.
+
+### 08-dueling-ddqn-side-panelty: CartPole-v2
+
+dueling ddqn으로 BipedalWalker-v3에서 의미있는 성적을 거두지 않았기에 CartPole-v2에서도 실험해보았다. 수렴이 더 빨라지기는 했다.
